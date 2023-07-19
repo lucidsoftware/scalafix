@@ -152,6 +152,56 @@ lazy val cli = projectMatrix
           pprint % Runtime
         )
     },
+    // Stuff needed to build a fat JAR:
+
+    /*
+     * I don't know why these are included, but they don't seem to be transitive dependencies in
+     * Maven and they're causing loads of conflicts, so I don't think they belong.
+     */
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.jline", "jline-reader"),
+      ExclusionRule("org.jline", "jline-terminal"),
+      ExclusionRule("org.jline", "jline-terminal-jna")
+    ),
+    assembly / assemblyMergeStrategy := {
+      /*
+       * This is unlikely to break things because the conflicting versions of
+       * `scala-collection-compat.properties` contain configuration parameters referencing different
+       * minor versions of Scala 2
+       */
+      case "scala-collection-compat.properties" => MergeStrategy.first
+      case PathList(components @ _*) =>
+        val lowerCaseComponents = components.map(_.toLowerCase)
+
+        // This might break things
+        if (lowerCaseComponents.lastOption.exists(_.endsWith(".properties"))) {
+          MergeStrategy.first
+        } else if (
+          /*
+           * These shouldn't break anything because the former two shouldn't even be included on the
+           * classpath, and the last only matters if we intend on calling `scalafix-cli` directly
+           * (we don't; we only want it on the classpath so we can wrap it)
+           */
+          lowerCaseComponents.lastOption.exists(_.endsWith(".txt")) ||
+          lowerCaseComponents.lastOption.exists { filename =>
+            List(".dsa", ".rsa", ".sf", ".txt").exists(filename.endsWith)
+          } ||
+
+          components == List("META-INF", "MANIFEST.MF") ||
+
+          /*
+           * This will probably break something we don't care about, but there's no way to reconcile
+           * the difference, because the conflict lies between the Scala 2 and 3 compilers
+           */
+          components == List("META-INF", "services", "javax.script.ScriptEngineFactory")
+        ) {
+          MergeStrategy.discard
+        } else {
+          MergeStrategy.deduplicate
+        }
+
+      case _                                    => MergeStrategy.deduplicate
+    },
     publishLocalTransitive := Def.taskDyn {
       val ref = thisProjectRef.value
       publishLocal.all(ScopeFilter(inDependencies(ref)))
