@@ -161,7 +161,8 @@ lazy val cli = projectMatrix
     excludeDependencies ++= Seq(
       ExclusionRule("org.jline", "jline-reader"),
       ExclusionRule("org.jline", "jline-terminal"),
-      ExclusionRule("org.jline", "jline-terminal-jna")
+      ExclusionRule("org.jline", "jline-terminal-jna"),
+      ExclusionRule("org.scala-lang.modules", "scala-asm"),
     ),
     assembly / assemblyMergeStrategy := {
       /*
